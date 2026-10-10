@@ -10,29 +10,29 @@ function deg2rad(angle) {
 }
 
 
-// Constructor
-function Model(name) {
-    this.name = name;
-    this.iVertexBuffer = gl.createBuffer();
-    this.count = 0;
+// // Constructor
+// function Model(name) {
+//     this.name = name;
+//     this.iVertexBuffer = gl.createBuffer();
+//     this.count = 0;
 
-    this.BufferData = function(vertices) {
+//     this.BufferData = function(vertices) {
 
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.iVertexBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STREAM_DRAW);
+//         gl.bindBuffer(gl.ARRAY_BUFFER, this.iVertexBuffer);
+//         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STREAM_DRAW);
 
-        this.count = vertices.length/3;
-    }
+//         this.count = vertices.length/3;
+//     }
 
-    this.Draw = function() {
+//     this.Draw = function() {
 
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.iVertexBuffer);
-        gl.vertexAttribPointer(shProgram.iAttribVertex, 3, gl.FLOAT, false, 0, 0);
-        gl.enableVertexAttribArray(shProgram.iAttribVertex);
+//         gl.bindBuffer(gl.ARRAY_BUFFER, this.iVertexBuffer);
+//         gl.vertexAttribPointer(shProgram.iAttribVertex, 3, gl.FLOAT, false, 0, 0);
+//         gl.enableVertexAttribArray(shProgram.iAttribVertex);
    
-        gl.drawArrays(gl.LINE_STRIP, 0, this.count);
-    }
-}
+//         gl.drawArrays(gl.LINE_STRIP, 0, this.count);
+//     }
+// }
 
 
 // Constructor
@@ -83,20 +83,20 @@ function draw() {
     /* Draw the six faces of a cube, with different colors. */
     gl.uniform4fv(shProgram.iColor, [1,1,0,1] );
 
-    surface.Draw();
+    surface.draw(shProgram.iAttribVertex);
 }
 
-function CreateSurfaceData()
-{
-    let vertexList = [];
+// function CreateSurfaceData()
+// {
+//     let vertexList = [];
 
-    for (let i=0; i<360; i+=5) {
-        vertexList.push( Math.sin(deg2rad(i)), 1, Math.cos(deg2rad(i)) );
-        vertexList.push( Math.sin(deg2rad(i)), 0, Math.cos(deg2rad(i)) );
-    }
+//     for (let i=0; i<360; i+=5) {
+//         vertexList.push( Math.sin(deg2rad(i)), 1, Math.cos(deg2rad(i)) );
+//         vertexList.push( Math.sin(deg2rad(i)), 0, Math.cos(deg2rad(i)) );
+//     }
 
-    return vertexList;
-}
+//     return vertexList;
+// }
 
 
 /* Initialize the WebGL context. Called from init() */
@@ -110,8 +110,7 @@ function initGL() {
     shProgram.iModelViewProjectionMatrix = gl.getUniformLocation(prog, "ModelViewProjectionMatrix");
     shProgram.iColor                     = gl.getUniformLocation(prog, "color");
 
-    surface = new Model('Surface');
-    surface.BufferData(CreateSurfaceData());
+    surface = new Model(gl);
 
     gl.enable(gl.DEPTH_TEST);
 }
