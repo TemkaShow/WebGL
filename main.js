@@ -5,112 +5,138 @@ let surface;                    // A surface model
 let shProgram;                  // A shader program
 let spaceball;                  // A SimpleRotator object that lets the user rotate the view by mouse.
 
-function deg2rad(angle) {
-    return angle * Math.PI / 180;
-}
+// Gouraud Shading - світло рахується у вершинному шейдері
+const myVertexShader = `
+    attribute vec3 vertex;
+    attribute vec3 normal;
+    
+    uniform mat4 ModelViewMatrix;
+    uniform mat4 ProjectionMatrix;
+    uniform mat3 NormalMatrix;
+    uniform vec3 LightPosition; 
+    
+    varying vec4 v_color;
+    
+    void main() {
+        vec4 viewPosition = ModelViewMatrix * vec4(vertex, 1.0);
+        gl_Position = ProjectionMatrix * viewPosition;
+        
+        vec3 N = normalize(NormalMatrix * normal);
+        vec3 L = normalize(LightPosition - viewPosition.xyz);
+        vec3 V = vec3(0.0, 0.0, 1.0); // Вектор на глядача
+        vec3 R = reflect(-L, N);
+        
+        // Колір моделі (golden)
+        vec3 ambient = vec3(0.2, 0.2, 0.0); 
+        vec3 diffuseColor = vec3(1.0, 0.84, 0.0); 
+        vec3 specularColor = vec3(1.0, 1.0, 1.0); 
+        
+        float diff = max(dot(N, L), 0.0);
+        float spec = 0.0;
+        if (diff > 0.0) {
+            spec = pow(max(dot(R, V), 0.0), 32.0);
+        }
+        
+        // Обчислення освітлення Гуро
+        v_color = vec4(ambient + (diffuseColor * diff) + (specularColor * spec), 1.0);
+    }
+`;
 
+// Фрагментний шейдер для Гуро лише отримує інтерпольований колір
+const myFragmentShader  = `
+    precision mediump float;
+    varying vec4 v_color;
+    void main() {
+        gl_FragColor = v_color;
+    }
+`;
 
-// // Constructor
-// function Model(name) {
-//     this.name = name;
-//     this.iVertexBuffer = gl.createBuffer();
-//     this.count = 0;
-
-//     this.BufferData = function(vertices) {
-
-//         gl.bindBuffer(gl.ARRAY_BUFFER, this.iVertexBuffer);
-//         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STREAM_DRAW);
-
-//         this.count = vertices.length/3;
-//     }
-
-//     this.Draw = function() {
-
-//         gl.bindBuffer(gl.ARRAY_BUFFER, this.iVertexBuffer);
-//         gl.vertexAttribPointer(shProgram.iAttribVertex, 3, gl.FLOAT, false, 0, 0);
-//         gl.enableVertexAttribArray(shProgram.iAttribVertex);
-   
-//         gl.drawArrays(gl.LINE_STRIP, 0, this.count);
-//     }
-// }
-
-
-// Constructor
 function ShaderProgram(name, program) {
-
     this.name = name;
     this.prog = program;
-
-    // Location of the attribute variable in the shader program.
     this.iAttribVertex = -1;
-    // Location of the uniform specifying a color for the primitive.
-    this.iColor = -1;
-    // Location of the uniform matrix representing the combined transformation.
-    this.iModelViewProjectionMatrix = -1;
+    this.iAttribNormal = -1;
+    
+    this.iModelViewMatrix = -1;
+    this.iProjectionMatrix = -1;
+    this.iNormalMatrix = -1;
+    this.iLightPosition = -1;
 
     this.Use = function() {
         gl.useProgram(this.prog);
     }
 }
 
+function updateModel() {
+    let u = parseInt(document.getElementById('uSlider').value);
+    let v = parseInt(document.getElementById('vSlider').value);
+    surface = new Model(gl, u, v);
+}
 
-/* Draws a colored cube, along with a set of coordinate axes.
- * (Note that the use of the above drawPrimitive function is not an efficient
- * way to draw with WebGL.  Here, the geometry is so simple that it doesn't matter.)
- */
 function draw() { 
-    gl.clearColor(0,0,0,1);
+    gl.clearColor(0.1, 0.1, 0.1, 1);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     
-    /* Set the values of the projection transformation */
     let projection = m4.perspective(Math.PI/8, 1, 8, 12); 
     
-    /* Get the view matrix from the SimpleRotator object.*/
     let modelView = spaceball.getViewMatrix();
-
     let rotateToPointZero = m4.axisRotation([0.707,0.707,0], 0.7);
     let translateToPointZero = m4.translation(0,0,-10);
 
     let matAccum0 = m4.multiply(rotateToPointZero, modelView );
     let matAccum1 = m4.multiply(translateToPointZero, matAccum0 );
         
-    /* Multiply the projection matrix times the modelview matrix to give the
-       combined transformation matrix, and send that to the shader program. */
-    let modelViewProjection = m4.multiply(projection, matAccum1 );
-
-    gl.uniformMatrix4fv(shProgram.iModelViewProjectionMatrix, false, modelViewProjection );
+    gl.uniformMatrix4fv(shProgram.iModelViewMatrix, false, matAccum1 );
+    gl.uniformMatrix4fv(shProgram.iProjectionMatrix, false, projection );
     
-    /* Draw the six faces of a cube, with different colors. */
-    gl.uniform4fv(shProgram.iColor, [1,1,0,1] );
+    // Normal Matrix (обернена транспонована до ModelView)
+    let nMat = [
+        matAccum1[0], matAccum1[1], matAccum1[2],
+        matAccum1[4], matAccum1[5], matAccum1[6],
+        matAccum1[8], matAccum1[9], matAccum1[10]
+    ];
+    gl.uniformMatrix3fv(shProgram.iNormalMatrix, false, nMat);
 
-    surface.draw(shProgram.iAttribVertex);
+    // Обертання джерела світла
+    let time = Date.now() * 0.001; // час у секундах
+    let lightX = Math.sin(time) * 5.0;
+    let lightZ = Math.cos(time) * 5.0;
+    let lightY = 3.0;
+    
+    // Множимо координати світла на View матрицю
+    let lightPosView = [
+        lightX * matAccum1[0] + lightY * matAccum1[4] + lightZ * matAccum1[8] + matAccum1[12],
+        lightX * matAccum1[1] + lightY * matAccum1[5] + lightZ * matAccum1[9] + matAccum1[13],
+        lightX * matAccum1[2] + lightY * matAccum1[6] + lightZ * matAccum1[10] + matAccum1[14]
+    ];
+    gl.uniform3fv(shProgram.iLightPosition, lightPosView);
+
+    surface.draw(shProgram);
+
+    // Викликаємо draw постійно для анімації світла
+    window.requestAnimationFrame(draw);
 }
-
-// function CreateSurfaceData()
-// {
-//     let vertexList = [];
-
-//     for (let i=0; i<360; i+=5) {
-//         vertexList.push( Math.sin(deg2rad(i)), 1, Math.cos(deg2rad(i)) );
-//         vertexList.push( Math.sin(deg2rad(i)), 0, Math.cos(deg2rad(i)) );
-//     }
-
-//     return vertexList;
-// }
-
 
 /* Initialize the WebGL context. Called from init() */
 function initGL() {
-    let prog = createProgram( gl, vertexShaderSource, fragmentShaderSource );
+    let prog = createProgram( gl, myVertexShader, myFragmentShader );
 
-    shProgram = new ShaderProgram('Basic', prog);
+    shProgram = new ShaderProgram('Gouraud', prog);
     shProgram.Use();
 
-    shProgram.iAttribVertex              = gl.getAttribLocation(prog, "vertex");
-    shProgram.iModelViewProjectionMatrix = gl.getUniformLocation(prog, "ModelViewProjectionMatrix");
-    shProgram.iColor                     = gl.getUniformLocation(prog, "color");
+    shProgram.iAttribVertex      = gl.getAttribLocation(prog, "vertex");
+    shProgram.iAttribNormal      = gl.getAttribLocation(prog, "normal");
+    
+    shProgram.iModelViewMatrix   = gl.getUniformLocation(prog, "ModelViewMatrix");
+    shProgram.iProjectionMatrix  = gl.getUniformLocation(prog, "ProjectionMatrix");
+    shProgram.iNormalMatrix      = gl.getUniformLocation(prog, "NormalMatrix");
+    shProgram.iLightPosition     = gl.getUniformLocation(prog, "LightPosition");
 
-    surface = new Model(gl);
+    updateModel(); // Створюємо початкову модель
+
+    // Прив'язуємо івенти до слайдерів
+    document.getElementById('uSlider').addEventListener('input', updateModel);
+    document.getElementById('vSlider').addEventListener('input', updateModel);
 
     gl.enable(gl.DEPTH_TEST);
 }
@@ -174,7 +200,7 @@ function init() {
         return;
     }
 
-    spaceball = new TrackballRotator(canvas, draw, 0);
+    spaceball = new TrackballRotator(canvas, () => {}, 0);
 
-    draw();
+    window.requestAnimationFrame(draw);
 }

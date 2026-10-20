@@ -26,6 +26,17 @@
 
 <div id="canvas-holder">
    <canvas width="600" height="600" id="webglcanvas" style="background-color:red"></canvas>
+   <div style="margin-top: 15px; color: blue;">
+        <label>U Granularity: 
+            <input type="range" id="uSlider" min="10" max="150" value="60" oninput="document.getElementById('uVal').innerText = this.value">
+            <span id="uVal">60</span>
+        </label>
+        <br><br>
+        <label>V Granularity: 
+            <input type="range" id="vSlider" min="10" max="150" value="60" oninput="document.getElementById('vVal').innerText = this.value">
+            <span id="vVal">60</span>
+        </label>
+    </div>
 </div>
 
 
