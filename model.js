@@ -14,6 +14,13 @@ class Model {
         const uMin = 0, uMax = 2 * Math.PI;
         const vMin = 0, vMax = Math.PI;
 
+        // Математична модель
+        // Змінний радіус: r(u,v) = R + a * sin(m * u) * sin(n * v)
+        // Сферичні координати:
+        //    x = r * sin(v) * cos(u)
+        //    y = r * sin(v) * sin(u)
+        //    z = r * cos(v)
+
         const getPoint = (u, v) => {
             const r = R + a * Math.sin(m * u) * Math.sin(n * v);
             return [
@@ -47,6 +54,9 @@ class Model {
         }
 
         // Розрахунок нормалей (Facet Angle Weighted Average)
+        // Формула нормалі вершини: N_vertex = Normalize( Sum( N_face * Angle_at_vertex ) )
+        // де: N_face = Normalize( Edge1 x Edge2 ) векторний добуток (cross) ребер трикутника
+        // Angle = acos( dot(Edge1, Edge2) ) кут між ребрами через скалярний добуток (dot)
         let normals = new Array(vertices.length).fill(0);
 
         // Допоміжні математичні функції
